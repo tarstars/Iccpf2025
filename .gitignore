@@ -1,0 +1,18 @@
+# OS/filesystem
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Env and local secrets
+.env
+*.env
+icfp_id.json
