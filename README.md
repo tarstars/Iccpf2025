@@ -17,6 +17,12 @@ Contributions, solutions, and documentation will be added as the contest progres
 
 ---
 
+## Problem PDF
+
+- Local copy: `docs/ICFPC2025-task.pdf`
+
+The local PDF mirrors the official online specification for convenient offline access.
+
 ## Local Setup
 
 - Python tooling is organized under `src/` and `scripts/`.
