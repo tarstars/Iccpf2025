@@ -62,6 +62,32 @@ def cmd_explore(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_problems(args: argparse.Namespace) -> int:
+    client = ICFPClient()
+    items = client.list_problems()
+    if args.raw:
+        print(json.dumps(items, indent=2))
+        return 0
+    # Try to render a clean numbered list
+    names = []
+    for item in items:
+        if isinstance(item, str):
+            names.append(item)
+        elif isinstance(item, dict):
+            for key in ("name", "problem", "problemName", "id", "title"):
+                if key in item:
+                    names.append(str(item[key]))
+                    break
+            else:
+                names.append(json.dumps(item))
+        else:
+            names.append(str(item))
+    print("Available problems:")
+    for i, name in enumerate(names):
+        print(f"{i:2d}. {name}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="icfp", description="ICFP 2025 API helper CLI")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -89,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--id-file", help="Path to file containing {\"id\": \"...\"}")
     pe.set_defaults(func=cmd_explore)
 
+    # problems
+    pp = sub.add_parser("problems", help="List available problems")
+    pp.add_argument("--raw", action="store_true", help="Print raw JSON response")
+    pp.set_defaults(func=cmd_problems)
+
     return p
 
 
@@ -100,4 +131,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

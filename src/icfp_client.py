@@ -42,6 +42,15 @@ class ICFPClient:
         except Exception as exc:  # noqa: BLE001
             raise ICFPError(f"Invalid JSON from {url}") from exc
 
+    def _get(self, path: str) -> Any:
+        url = f"{self.base_url}{path}"
+        r = requests.get(url, timeout=self.timeout)
+        r.raise_for_status()
+        try:
+            return r.json()
+        except Exception as exc:  # noqa: BLE001
+            raise ICFPError(f"Invalid JSON from {url}") from exc
+
     # API methods
     def register(self, name: str, pl: str, email: str) -> Team:
         data = {"name": name, "pl": pl, "email": email}
@@ -55,6 +64,20 @@ class ICFPClient:
     def explore(self, team_id: str, plans: Iterable[str]) -> Dict[str, Any]:
         payload = {"id": team_id, "plans": list(plans)}
         return self._post("/explore", payload)
+
+    def guess(self, team_id: str, map_obj: Dict[str, Any]) -> Dict[str, Any]:
+        payload = {"id": team_id, "map": map_obj}
+        return self._post("/guess", payload)
+
+    def list_problems(self) -> List[Any]:
+        """Return the list of available problems.
+
+        According to the public notebook, GET /select returns the list.
+        """
+        data = self._get("/select")
+        if not isinstance(data, list):
+            raise ICFPError("Unexpected response for problem list: not a list")
+        return data
 
 
 # Local secret helpers
@@ -77,4 +100,3 @@ def load_team_id(path: str = "icfp_id.json") -> Optional[str]:
     if env:
         return env
     return None
-

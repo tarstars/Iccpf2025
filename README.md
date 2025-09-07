@@ -65,6 +65,68 @@ You can explicitly pass your team id with `--id`, or set it via environment:
 export ICFP_TEAM_ID=...  # your secret id
 ```
 
+- List available problems:
+
+```
+PYTHONPATH=. python3 scripts/icfp_cli.py problems
+# To see the raw JSON response
+PYTHONPATH=. python3 scripts/icfp_cli.py problems --raw
+```
+
+## Solving and Submitting
+
+Use the general solver script to select, explore, learn the map, and submit a guess.
+
+- Prereqs:
+  - Install deps: `pip install -r requirements.txt`
+  - Set your team id via env or `icfp_id.json` (see above)
+
+- Solve a problem (default: `probatio`):
+
+```
+PYTHONPATH=. python3 scripts/solve.py --problem probatio
+```
+
+- Using a specific Python environment (example):
+
+```
+PYTHONPATH=. ~/envs/env312/bin/python3 scripts/solve.py --problem primus
+```
+
+The solver will:
+- POST `/select` for the chosen problem,
+- repeatedly call `/explore` to gather observations,
+- reconstruct the map (states, transitions, labels),
+- POST `/guess` with the learned map,
+- and print whether it was correct.
+
+## Where to Look (Algorithm)
+
+- `scripts/solve.py`
+  - Entry point: `main()` parses flags like `--problem`, `--no-submit`, `--max-e-depth`, `--stats`.
+  - Core logic: `solve_and_optionally_submit()` implements an L*-style observation table:
+    - Closes the set of representative prefixes `S` and refines the suffix set `E` to ensure consistency.
+    - Builds transitions and a minimal representative per distinct row.
+    - Constructs the map and optionally submits via `/guess`.
+  - Key functions to read:
+    - `explore_plans()` — batches queries to `/explore` and caches results.
+    - `close_table()` and `find_inconsistency()` — maintain closed and consistent observation table.
+    - `refine_e_with()` — adds distinguishing suffixes to separate ambiguous states.
+
+- `src/icfp_client.py`
+  - Thin HTTP client for the contest API: `select()`, `explore()`, `guess()`, and `list_problems()`.
+
+- `notebooks/Untitled1.ipynb`
+  - Contains the exploratory derivation and a working approach (up to aleph) that this CLI closely follows: fixed suffix sets with dynamic expansion, closure on representative rows, targeted probes for missing/mismatched transitions, and mutual-edge map assembly.
+
+- List available problems:
+
+```
+PYTHONPATH=. python3 scripts/icfp_cli.py problems
+# To see the raw JSON response
+PYTHONPATH=. python3 scripts/icfp_cli.py problems --raw
+```
+
 ## Notebooks
 
 - Keep notebooks in `notebooks/`.

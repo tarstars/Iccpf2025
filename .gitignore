@@ -16,3 +16,4 @@ venv/
 .env
 *.env
 icfp_id.json
+.idea/
