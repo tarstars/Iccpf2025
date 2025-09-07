@@ -50,6 +50,14 @@ class ICFPClient:
             return r.json()
         except Exception as exc:  # noqa: BLE001
             raise ICFPError(f"Invalid JSON from {url}") from exc
+    def _get_with_params(self, path: str, params: Dict[str, Any]) -> Any:
+        url = f"{self.base_url}{path}"
+        r = requests.get(url, params=params, timeout=self.timeout)
+        r.raise_for_status()
+        try:
+            return r.json()
+        except Exception as exc:  # noqa: BLE001
+            raise ICFPError(f"Invalid JSON from {url}") from exc
 
     # API methods
     def register(self, name: str, pl: str, email: str) -> Team:
@@ -77,6 +85,28 @@ class ICFPClient:
         data = self._get("/select")
         if not isinstance(data, list):
             raise ICFPError("Unexpected response for problem list: not a list")
+        return data
+
+    def scores(self, team_id: str) -> Dict[str, Any]:
+        """Return a mapping from problem name to your team's score (expeditions).
+
+        Backed by GET base URL with query param `id` per the public scoreboard page.
+        """
+        data = self._get_with_params("/", {"id": team_id})
+        if not isinstance(data, dict):
+            raise ICFPError("Unexpected scores response: not a dict")
+        return data
+
+    def leaderboard(self, problem: str) -> List[Dict[str, Any]]:
+        """Return leaderboard entries for a problem or 'global'.
+
+        For a specific problem, entries have 'teamName', 'teamPl', 'score'.
+        For 'global', 'score' contains Borda points.
+        """
+        path = f"/leaderboard/{problem}"
+        data = self._get(path)
+        if not isinstance(data, list):
+            raise ICFPError("Unexpected leaderboard response: not a list")
         return data
 
 

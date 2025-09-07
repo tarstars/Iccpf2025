@@ -73,6 +73,28 @@ PYTHONPATH=. python3 scripts/icfp_cli.py problems
 PYTHONPATH=. python3 scripts/icfp_cli.py problems --raw
 ```
 
+## Scores and Leaderboards
+
+- Show your current best scores (fewest expeditions per problem):
+
+```
+PYTHONPATH=. python3 scripts/icfp_cli.py scores
+# or explicitly:
+PYTHONPATH=. python3 scripts/icfp_cli.py scores --id YOUR_TEAM_ID
+```
+
+- View a leaderboard:
+
+```
+# Global (Borda points):
+PYTHONPATH=. python3 scripts/icfp_cli.py leaderboard --problem global
+
+# Problem-specific (ranked by expeditions; lower is better):
+PYTHONPATH=. python3 scripts/icfp_cli.py leaderboard --problem primus
+```
+
+Scoring is based on the number of expeditions (route-plan measurements) used to produce a correct map. Your per‑problem score equals your minimal `queryCount` at the time of a correct `/guess`. Global ranking uses Borda count across problems (see the spec).
+
 ## Solving and Submitting
 
 Use the general solver script to select, explore, learn the map, and submit a guess.

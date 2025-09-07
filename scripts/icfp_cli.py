@@ -88,6 +88,49 @@ def cmd_problems(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_scores(args: argparse.Namespace) -> int:
+    team_id = _resolve_team_id(args.id, args.id_file)
+    if not team_id:
+        print("Error: team id not found. Provide --id, --id-file, or set ICFP_TEAM_ID / icfp_id.json", file=sys.stderr)
+        return 2
+    client = ICFPClient()
+    data = client.scores(team_id)
+    if args.raw:
+        print(json.dumps(data, indent=2))
+        return 0
+    print("Your best expeditions per problem (lower is better):")
+    for k in sorted(data.keys()):
+        print(f"- {k}: {data[k]}")
+    return 0
+
+
+def cmd_leaderboard(args: argparse.Namespace) -> int:
+    problem = args.problem or "global"
+    client = ICFPClient()
+    rows = client.leaderboard(problem)
+    if args.raw:
+        print(json.dumps(rows, indent=2))
+        return 0
+    print(f"Leaderboard for {problem}:")
+    # Sort: for global, higher score is better; for problems, lower expeditions is better
+    keyf = (lambda r: (-int(r.get("score", 0)) if problem == "global" else int(r.get("score", 10**9))))
+    rows_sorted = sorted(rows, key=keyf)
+    print("Rank  Score  Team (PL)")
+    rank = 1
+    prev = None
+    display = 1
+    for r in rows_sorted:
+        if r.get("score") is None:
+            continue
+        sc = r.get("score")
+        if prev is not None and sc != prev:
+            display = rank
+        print(f"{display:>4}  {sc:>5}  {r.get('teamName','<no name>')} ({r.get('teamPl','<no pl>')})")
+        prev = sc
+        rank += 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="icfp", description="ICFP 2025 API helper CLI")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -119,6 +162,19 @@ def build_parser() -> argparse.ArgumentParser:
     pp = sub.add_parser("problems", help="List available problems")
     pp.add_argument("--raw", action="store_true", help="Print raw JSON response")
     pp.set_defaults(func=cmd_problems)
+
+    # scores
+    psc = sub.add_parser("scores", help="Show your current best scores per problem (expeditions)")
+    psc.add_argument("--id", help="Team id (overrides env/file)")
+    psc.add_argument("--id-file", help="Path to file containing {\"id\": \"...\"}")
+    psc.add_argument("--raw", action="store_true", help="Print raw JSON response")
+    psc.set_defaults(func=cmd_scores)
+
+    # leaderboard
+    plb = sub.add_parser("leaderboard", help="Show leaderboard for a problem or 'global'")
+    plb.add_argument("--problem", help="Problem name (or 'global')")
+    plb.add_argument("--raw", action="store_true", help="Print raw JSON response")
+    plb.set_defaults(func=cmd_leaderboard)
 
     return p
 
