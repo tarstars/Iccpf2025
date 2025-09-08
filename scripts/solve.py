@@ -56,9 +56,10 @@ def solve_and_optionally_submit(
                 if isinstance(v, list):
                     # Mask labels to 2 bits as per spec
                     results[p] = [int(x) & 3 for x in v]
-            if "queryCount" in data and verbose:
+            if "queryCount" in data:
                 query_count_seen = data["queryCount"]
-                print(f"queryCount: {query_count_seen}")
+                if verbose:
+                    print(f"queryCount: {query_count_seen}")
 
     def label_at(plan: str, pos: int) -> int:
         row = results.get(plan)
@@ -198,11 +199,14 @@ def solve_and_optionally_submit(
             if stats and query_count_seen is not None:
                 print(f"Total queryCount observed: {query_count_seen}")
             if not submit:
-                return {"submitted": False, "map": final_map}
+                return {"submitted": False, "map": final_map, "queryCount": query_count_seen}
             guess_resp = client.guess(team_id, final_map)
             if verbose:
                 print("Guess response:", json.dumps(guess_resp, indent=2))
-            return guess_resp
+            elif stats and query_count_seen is not None:
+                # Quiet mode summary
+                print(f"Guess correct: {bool(guess_resp.get('correct'))}; queryCount: {query_count_seen}")
+            return {"submitted": True, "response": guess_resp, "queryCount": query_count_seen, "map": final_map}
 
         probes = probes_for_gaps(reps, delta, non_mutual, missing)
         if probes:
@@ -242,7 +246,7 @@ def solve_and_optionally_submit(
     if verbose:
         print("Stopped without closure; returning partial map")
         print(json.dumps(partial_map, indent=2))
-    return {"submitted": False, "map": partial_map}
+    return {"submitted": False, "map": partial_map, "queryCount": query_count_seen}
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -250,6 +254,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--problem", default="probatio", help="Problem name to solve (default: probatio)")
     p.add_argument("--max-e-depth", type=int, default=2, help="Max distinguishing suffix depth for E (default: 2)")
     p.add_argument("--no-submit", action="store_true", help="Do not submit; only print learned map")
+    p.add_argument("--submit-if-better", action="store_true", help="Submit only if queryCount improves your current best for the problem")
+    p.add_argument("--out-map", help="Write learned map JSON to this path (applies in any mode)")
     p.add_argument("--quiet", action="store_true", help="Reduce logging output")
     p.add_argument("--stats", action="store_true", help="Print query stats if available")
     args = p.parse_args(argv)
@@ -259,14 +265,56 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("Error: team id not found. Provide icfp_id.json or set ICFP_TEAM_ID.", file=sys.stderr)
         return 2
 
-    solve_and_optionally_submit(
-        team_id,
-        args.problem,
-        max_e_depth=args.max_e_depth,
-        submit=not args.no_submit,
-        verbose=not args.quiet,
-        stats=args.stats,
-    )
+    # If submit-if-better, we run in no-submit mode first, compare with current best, then optionally submit
+    if args.submit_if_better:
+        client = ICFPClient()
+        best = None
+        try:
+            smap = client.scores(team_id)
+            if isinstance(smap, dict):
+                best = smap.get(args.problem)
+        except Exception:
+            best = None
+        # Run without submitting to get map and queryCount
+        res = solve_and_optionally_submit(
+            team_id,
+            args.problem,
+            max_e_depth=args.max_e_depth,
+            submit=False,
+            verbose=not args.quiet,
+            stats=True,
+        )
+        learned_map = res.get("map") if isinstance(res, dict) else None
+        if args.out_map and learned_map is not None:
+            import json as _json, pathlib as _pathlib
+            _pathlib.Path(args.out_map).write_text(_json.dumps(learned_map, indent=2))
+        q = None
+        if isinstance(res, dict):
+            q = res.get("queryCount")
+        # Submit if we have no prior best, or this run improved it
+        should_submit = (best is None) or (isinstance(q, int) and best is not None and q < best)
+        if should_submit and learned_map is not None:
+            resp = client.guess(team_id, learned_map)
+            if not args.quiet:
+                print("Guess response:", _json.dumps(resp, indent=2))
+        else:
+            if not args.quiet:
+                print(f"Skipped submission (best={best}, trial={q})")
+        return 0
+    else:
+        res = solve_and_optionally_submit(
+            team_id,
+            args.problem,
+            max_e_depth=args.max_e_depth,
+            submit=not args.no_submit,
+            verbose=not args.quiet,
+            stats=args.stats,
+        )
+        if args.out_map and isinstance(res, dict):
+            learned_map = res.get("map") or res.get("learned_map")
+            if learned_map is not None:
+                import json as _json, pathlib as _pathlib
+                _pathlib.Path(args.out_map).write_text(_json.dumps(learned_map, indent=2))
     return 0
 
 
